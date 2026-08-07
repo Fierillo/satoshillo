@@ -1,13 +1,13 @@
-const CURRENCIES = ['ARS', 'USD', 'EUR'];
+const CURRENCIES = ['ARS', 'USD', 'EUR', 'JPY'];
 
 const sources = [
   {
     name: 'CoinGecko',
     fetch: async () => {
-      const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=ars,usd,eur');
+      const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=ars,usd,eur,jpy');
       if (!r.ok) return null;
       const d = await r.json();
-      return { ARS: d.bitcoin.ars, USD: d.bitcoin.usd, EUR: d.bitcoin.eur };
+      return { ARS: d.bitcoin.ars, USD: d.bitcoin.usd, EUR: d.bitcoin.eur, JPY: d.bitcoin.jpy };
     }
   },
   {
@@ -16,7 +16,7 @@ const sources = [
       const r = await fetch('https://api.yadio.io/exrates/BTC');
       if (!r.ok) return null;
       const d = await r.json();
-      return { ARS: d.BTC.ARS, USD: d.BTC.USD, EUR: d.BTC.EUR };
+      return { ARS: d.BTC.ARS, USD: d.BTC.USD, EUR: d.BTC.EUR, JPY: d.BTC.JPY };
     }
   },
   {
@@ -26,7 +26,7 @@ const sources = [
       if (!r.ok) return null;
       const d = await r.json();
       const usd = parseFloat(d.data.priceUsd);
-      return { USD: usd, EUR: usd * 0.92, ARS: usd * 1050 };
+      return { USD: usd, EUR: usd * 0.92, ARS: usd * 1050, JPY: usd * 155 };
     }
   },
   {
@@ -36,7 +36,7 @@ const sources = [
       if (!r.ok) return null;
       const d = await r.json();
       const usd = parseFloat(d.price);
-      return { USD: usd, EUR: usd * 0.92, ARS: usd * 1050 };
+      return { USD: usd, EUR: usd * 0.92, ARS: usd * 1050, JPY: usd * 155 };
     }
   },
   {
@@ -46,7 +46,7 @@ const sources = [
       if (!r.ok) return null;
       const d = await r.json();
       const usd = parseFloat(d.result.XBTUSD.c[0]);
-      return { USD: usd, EUR: usd * 0.92, ARS: usd * 1050 };
+      return { USD: usd, EUR: usd * 0.92, ARS: usd * 1050, JPY: usd * 155 };
     }
   }
 ];
@@ -100,6 +100,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status !== 'complete' || !tab.url) return;
+  try {
+    const origin = new URL(tab.url).origin;
+    chrome.storage.local.get('disabledSites', data => {
+      const disabled = data.disabledSites || [];
+      const isDisabled = disabled.includes(origin);
+      chrome.action.setBadgeText({ text: isDisabled ? 'OFF' : '', tabId });
+      chrome.action.setBadgeBackgroundColor({ color: '#F44336', tabId });
+    });
+  } catch {}
+});
+
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab.url) return;
   const url = new URL(tab.url);
@@ -115,5 +128,18 @@ chrome.action.onClicked.addListener(async (tab) => {
       chrome.action.setBadgeBackgroundColor({ color: '#F44336', tabId: tab.id });
       chrome.tabs.sendMessage(tab.id, { action: 'toggleDisabled', disabled: isDisabled });
     });
+  });
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.tabs.query({}, tabs => {
+    for (const tab of tabs) {
+      if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:')) {
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        }).catch(() => {});
+      }
+    }
   });
 });

@@ -16,7 +16,7 @@
     },
     "default_title": "Satoshillo"
   },
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
     "https://api.coingecko.com/*",
     "https://api.yadio.io/*",

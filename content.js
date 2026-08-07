@@ -1,15 +1,20 @@
 const satoshisPerBitcoin = 100000000;
 const PRELOAD_FACTOR = 1.5;
-const CURRENCIES = ['ARS', 'USD', 'EUR'];
+const CURRENCIES = ['ARS', 'USD', 'EUR', 'JPY'];
 const MAGNITUDES = { k: 1e3, m: 1e6, b: 1e9, t: 1e12 };
 const CURRENCY_WORDS = 'ars|usd|eur|euros|pesos|dolares|dollars';
+const FOREX_PAIRS = 'usd|eur|gbp|jpy|chf|aud|nzd|cad';
 const NUMBER_TOKEN = '\\d[\\d,]*\\.?\\d*';
 const MAGNITUDE_TOKEN = '(?:mil\\s?millones|billones|billón|trillones|trillón|millones|millón|million|millions|mill\\b|billion|billions|bill\\b|trillion|trillions|trill\\b|[kmbt]\\b)';
+const CURRENCY_PAIR_PATTERN = '(?:' + FOREX_PAIRS + ')\\/(?:' + FOREX_PAIRS + ')';
+const FOREX_PAIR_REGEX = new RegExp('\\b' + CURRENCY_PAIR_PATTERN + '\\b', 'i');
+const BARE_NUMBER_PATTERN = new RegExp('\\b' + NUMBER_TOKEN + '\\b', 'g');
 const CANDIDATE_PATTERN = new RegExp(
   '[$€]\\s?' + NUMBER_TOKEN + '\\s?(?:' + MAGNITUDE_TOKEN + ')?|' +
   '\\b(?:' + CURRENCY_WORDS + ')\\s*' + NUMBER_TOKEN + '\\s?(?:' + MAGNITUDE_TOKEN + ')?|' +
   '\\b' + NUMBER_TOKEN + '\\s?(?:' + MAGNITUDE_TOKEN + ')(?:\\s*(?:' + CURRENCY_WORDS + '))?|' +
-  '\\b' + NUMBER_TOKEN + '\\s*(?:' + CURRENCY_WORDS + ')', 'gi');
+  '\\b' + NUMBER_TOKEN + '\\s*(?:' + CURRENCY_WORDS + ')|' +
+  CURRENCY_PAIR_PATTERN + '\\b[^\\d]{0,30}\\b(' + NUMBER_TOKEN + ')', 'gi');
 
 let pageLanguage = 'en';
 
@@ -69,6 +74,67 @@ function isElementInBounds(element, bounds) {
 
 const ES_MARKERS = ['precio', 'pago', 'pagas', 'cuota', 'envío', 'envio', 'comprar', 'importe', 'argentin'];
 const EN_MARKERS = ['price', 'payment', 'shipping', 'cost', 'buy', 'amount', 'total'];
+
+const NEGATIVE_INDICATORS = [
+  // Index / chart terms
+  /\b(?:dxy|s&p|nasdaq|dow|index|candle|support|resistance|breakout|trend|fibonacci|rally|plunge|surge)\b/i,
+  // Pip / points
+  /\b(?:pips?|points?|ticks?)\b/i,
+  // Economic / jobs
+  /\b(?:jobs?|unemploy|payroll|gdp|inflation|deflation|recession|economy|economic|report|data)\b/i,
+  // Movement verbs
+  /\b(?:dropped|fell|rose|gained|increased|decreased|climbed|slid|tumbled|soared|crashed|rallied|plunged|surged|dipped|rebounded|slumped)\b/i,
+  // Forex / trading
+  /\b(?:forex|fx|pair|trade|trading|position|margin|leverage|spread)\b/i,
+  // Rate / yield
+  /\b(?:rate|yield|basis\s*points?|bps)\b/i,
+  // Spanish equivalents
+  /\b(?:par|índice|vela|soporte|resistencia|ruptura|tendencia|pip|punto|dato|informe|economía|económico|desempleo|empleo|subió|bajó|cayó|suba|baja)\b/i
+];
+
+const POSITIVE_INDICATORS = [
+  // Price / shopping
+  /\b(?:price|cost|buy|pay|total|amount|sale|deal|purchase|order|cart|checkout|item|product|service|subscribe|membership|fee|charge|bill|invoice)\b/i,
+  // Spanish equivalents
+  /\b(?:precio|costo|comprar|pagar|total|importe|oferta|producto|servicio|suscripción|cargo|factura)\b/i,
+  // Currency symbols or words explicitly
+  /[$€]/,
+  /\b(?:ars|usd|eur|euros|pesos|dolares|dollars)\b/i
+];
+
+function isLikelyPrice(context, candidateText) {
+  const text = context.toLowerCase();
+  const candidate = candidateText.toLowerCase();
+
+  // If candidate has a currency symbol, almost certainly a price
+  if (/[$€]/.test(candidate)) return true;
+
+  // If candidate has a currency word, likely a price
+  if (/\b(?:ars|usd|eur|euros|pesos|dolares|dollars)\b/i.test(candidate)) return true;
+
+  // If forex pair is in the same sentence, it's a price (bypass negatives)
+  const candidateRegex = new RegExp('\\b' + candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+  const candidateMatch = text.match(candidateRegex);
+  const candidateIndex = candidateMatch ? candidateMatch.index : -1;
+  if (candidateIndex !== -1 && hasForexPairInSentence(text, candidateIndex)) return true;
+
+  // Check for negative indicators in context (exclude the candidate itself)
+  const contextWithoutCandidate = text.replace(candidate, '');
+  for (const regex of NEGATIVE_INDICATORS) {
+    if (regex.test(contextWithoutCandidate)) return false;
+  }
+
+  // If context has a forex pair near the candidate, it's a price
+  if (candidateIndex !== -1 && hasForexPairNear(text, candidateIndex, 80)) return true;
+
+  // Check for positive indicators
+  for (const regex of POSITIVE_INDICATORS) {
+    if (regex.test(text)) return true;
+  }
+
+  // Default: uncertain
+  return null;
+}
 
 function extractNumberToken(raw) {
   const match = raw.match(/[\d]+(?:[\s.,]\d+)*/);
@@ -134,7 +200,7 @@ function detectMagnitude(text) {
   return 1;
 }
 
-function parseCandidate(raw) {
+function parseCandidate(raw, context) {
   const normalized = raw.toLowerCase();
   const token = extractNumberToken(normalized);
   let amount = token ? parseNumber(token, pageLanguage === 'es') : NaN;
@@ -143,7 +209,13 @@ function parseCandidate(raw) {
   amount *= magnitude;
   const wordMatch = normalized.match(/\b(ars|usd|eur|euros|pesos|dolares|dollars)\b/);
   let currencyHint = null;
-  if (wordMatch) {
+
+  // Forex pair: use quote currency (USD/JPY → JPY)
+  const pairInRaw = normalized.match(new RegExp('\\b(' + FOREX_PAIRS + ')\\/(' + FOREX_PAIRS + ')\\b'));
+  if (pairInRaw) {
+    const quote = pairInRaw[2];
+    if (CURRENCY_CODE_MAP[quote]) currencyHint = CURRENCY_CODE_MAP[quote];
+  } else if (wordMatch) {
     const word = wordMatch[1];
     if (word === 'ars' || word === 'pesos') currencyHint = 'ARS';
     else if (word === 'eur' || word === 'euros') currencyHint = 'EUR';
@@ -153,7 +225,14 @@ function parseCandidate(raw) {
   }
   const hasCurrencyWord = currencyHint !== null;
   const hasSymbol = /[$€]/.test(normalized);
-  const valid = hasCurrencyWord || hasSymbol || hasMagnitude;
+  const hasForexContext = context && FOREX_PAIR_REGEX.test(context);
+  const hasValidSignal = hasCurrencyWord || hasSymbol || hasMagnitude || hasForexContext;
+
+  // Semantic check: is this likely a price?
+  const semanticResult = context ? isLikelyPrice(context, raw) : null;
+  if (semanticResult === false) return { amount, currencyHint, valid: false };
+
+  const valid = hasValidSignal && semanticResult !== false;
   return { amount, currencyHint, valid };
 }
 
@@ -166,8 +245,18 @@ function detectPageLanguage() {
   return 'en';
 }
 
+const CURRENCY_CODE_MAP = { usd: 'USD', eur: 'EUR', gbp: 'GBP', jpy: 'JPY', chf: 'CHF', aud: 'AUD', nzd: 'NZD', cad: 'CAD', ars: 'ARS' };
+
 function inferCurrency(contextText, pageLanguage) {
   const context = contextText.toLowerCase();
+
+  // Forex pair: number is in the second currency
+  const pairMatch = context.match(new RegExp('\\b(' + FOREX_PAIRS + ')\\/(' + FOREX_PAIRS + ')\\b'));
+  if (pairMatch) {
+    const quote = pairMatch[2];
+    if (CURRENCY_CODE_MAP[quote]) return CURRENCY_CODE_MAP[quote];
+  }
+
   if (/\b(ars|pesos|peso)\b/.test(context)) return 'ARS';
   if (/\b(usd|dolares|dólares|dollars|dollar|dolar)\b/.test(context)) return 'USD';
   if (context.includes('€') || /\b(eur|euros|euro)\b/.test(context)) return 'EUR';
@@ -220,7 +309,6 @@ function createFloatButton(candidate) {
   button.type = 'button';
   button.className = 'satoshillo-float';
   button.title = 'ARS / USD / EUR';
-  button.textContent = '₿';
   button.addEventListener('mouseenter', () => {
     openCurrencyMenu(button, candidate);
   });
@@ -311,15 +399,68 @@ function showPriceUnavailable(candidate) {
   removeExistingMenus();
 }
 
+function getAncestorContext(node) {
+  let el = node.parentNode;
+  let best = el ? el.textContent : '';
+  let depth = 0;
+  while (el && depth < 5) {
+    const t = el.textContent;
+    if (t && t.length > best.length) best = t;
+    if (t && t.length > 200) break;
+    el = el.parentElement;
+    depth++;
+  }
+  return best || '';
+}
+
+function hasForexPairNear(text, index, range) {
+  const start = Math.max(0, index - range);
+  const end = Math.min(text.length, index + range);
+  return FOREX_PAIR_REGEX.test(text.slice(start, end));
+}
+
+function hasForexPairInSentence(text, index) {
+  const beforeMatches = [...text.slice(0, index).matchAll(/[.!?]\s/g)];
+  const before = beforeMatches.length > 0 ? beforeMatches[beforeMatches.length - 1].index + 1 : 0;
+  const afterIndex = text.slice(index).search(/[.!?](?:\s|$)/);
+  const end = afterIndex === -1 ? text.length : index + afterIndex;
+  const sentence = text.slice(before, end);
+  const pairMatch = sentence.match(FOREX_PAIR_REGEX);
+  if (!pairMatch) return false;
+  const pairIndex = sentence.indexOf(pairMatch[0]);
+  const wordDist = sentence.slice(0, index - before).split(/\s+/).length;
+  return wordDist <= 6;
+}
+
+function isInEditableContext(node) {
+  let el = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+  while (el && el !== document.body) {
+    if (el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+    el = el.parentElement;
+  }
+  return false;
+}
+
 function processTextNode(node) {
+  if (isInEditableContext(node)) return;
   const parentTag = node.parentNode && node.parentNode.tagName;
   if (parentTag === 'SCRIPT' || parentTag === 'STYLE' || parentTag === 'TEXTAREA') return;
   const text = node.textContent;
   if (!text) return;
-  const matches = [...text.matchAll(CANDIDATE_PATTERN)];
-  if (matches.length === 0) return;
+  let matches = [...text.matchAll(CANDIDATE_PATTERN)];
 
-  const context = node.parentNode ? node.parentNode.textContent : '';
+  const context = getAncestorContext(node);
+
+  if (matches.length === 0 && context) {
+    const textLower = text.toLowerCase();
+    const ctxLower = context.toLowerCase();
+    const ctxIndex = ctxLower.indexOf(textLower);
+    if (ctxIndex !== -1 && hasForexPairNear(ctxLower, ctxIndex, 80)) {
+      matches = [...text.matchAll(BARE_NUMBER_PATTERN)];
+    }
+  }
+
+  if (matches.length === 0) return;
   const fragment = document.createDocumentFragment();
   let lastIndex = 0;
   matches.forEach(match => {
@@ -327,7 +468,7 @@ function processTextNode(node) {
       fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
     }
     const raw = match[0];
-    const parsed = parseCandidate(raw);
+    const parsed = parseCandidate(raw, context);
     if (parsed.amount && !isNaN(parsed.amount) && parsed.valid) {
       const currency = parsed.currencyHint || inferCurrency(context, pageLanguage);
       fragment.appendChild(buildCandidateSpan(raw, parsed.amount, currency));
@@ -343,12 +484,23 @@ function processTextNode(node) {
 }
 
 function processContainer(element) {
+  if (isInEditableContext(element)) return;
   const text = element.textContent;
   if (!text) return;
-  const matches = [...text.matchAll(CANDIDATE_PATTERN)];
-  if (matches.length === 0) return;
+  let matches = [...text.matchAll(CANDIDATE_PATTERN)];
 
   const context = element.parentNode ? element.parentNode.textContent : text;
+
+  if (matches.length === 0 && context) {
+    const textLower = text.toLowerCase();
+    const ctxLower = context.toLowerCase();
+    const ctxIndex = ctxLower.indexOf(textLower);
+    if (ctxIndex !== -1 && hasForexPairNear(ctxLower, ctxIndex, 80)) {
+      matches = [...text.matchAll(BARE_NUMBER_PATTERN)];
+    }
+  }
+
+  if (matches.length === 0) return;
   const fragment = document.createDocumentFragment();
   let lastIndex = 0;
   matches.forEach(match => {
@@ -356,7 +508,7 @@ function processContainer(element) {
       fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
     }
     const raw = match[0];
-    const parsed = parseCandidate(raw);
+    const parsed = parseCandidate(raw, context);
     if (parsed.amount && !isNaN(parsed.amount) && parsed.valid) {
       const currency = parsed.currencyHint || inferCurrency(context, pageLanguage);
       fragment.appendChild(buildCandidateSpan(raw, parsed.amount, currency));
@@ -390,6 +542,8 @@ function walkDomTree(node, bounds) {
   if (node.nodeType !== Node.ELEMENT_NODE) return;
   if (node.classList && node.classList.contains('satoshillo-candidate')) return;
   if (node.classList && (node.classList.contains('satoshillo-menu') || node.classList.contains('satoshillo-option'))) return;
+  if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA' || node.tagName === 'SELECT') return;
+  if (node.isContentEditable) return;
   if (!isElementInBounds(node, bounds)) return;
   if (isLeafTextContainer(node)) {
     processContainer(node);
@@ -444,9 +598,9 @@ function startWatching() {
     let pending = null;
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
-        if (!isInsideSatoshillo(node)) pending = pending || node;
+        if (!isInsideSatoshillo(node) && !isInEditableContext(node)) pending = pending || node;
       }
-      if (mutation.type === 'characterData' && !isInsideSatoshillo(mutation.target)) {
+      if (mutation.type === 'characterData' && !isInsideSatoshillo(mutation.target) && !isInEditableContext(mutation.target)) {
         pending = pending || mutation.target;
       }
     }
@@ -482,8 +636,9 @@ chrome.runtime.onMessage.addListener((request) => {
 const style = document.createElement('style');
 style.textContent = `
   .satoshillo-candidate { position: relative; display: inline; white-space: nowrap; }
-  .satoshillo-float { position: absolute; top: -10px; right: -14px; padding: 0 3px; border: 1px solid #f7931a; border-radius: 3px; background: #fff; color: #f7931a; font-size: 12px; cursor: pointer; font-family: inherit; line-height: 14px; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
-  .satoshillo-float:hover { border-color: #b86a0e; background: #fff7ed; }
+  .satoshillo-float { position: absolute; top: -10px; right: -14px; padding: 0 3px; border: 1px solid #f7931a; border-radius: 3px; background: #fff; color: #f7931a; font-size: 12px; cursor: pointer; font-family: inherit; line-height: 14px; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,.25); opacity: 0.4; transition: opacity 0.15s; user-select: none; }
+  .satoshillo-float::after { content: '₿'; }
+  .satoshillo-float:hover { border-color: #b86a0e; background: #fff7ed; opacity: 1; }
   .satoshillo-menu { position: fixed; z-index: 2147483647; background: #fff !important; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.15); padding: 2px; color: #000 !important; font-family: Arial, Helvetica, sans-serif !important; }
   .satoshillo-option { display: block; width: 100%; padding: 4px 10px; font-size: 12px; border: none; background: #fff !important; color: #000 !important; cursor: pointer; text-align: left; font-family: inherit; }
   .satoshillo-option:disabled { color: #999 !important; cursor: default; }

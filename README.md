@@ -5,7 +5,7 @@ Convierte precios en ARS, USD y EUR a satoshis en tiempo real en cualquier pági
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-F44336?logo=googlechrome&logoColor=white)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4CAF50?logo=google&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2021-F7DF1E?logo=javascript&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green)
+![License](https://img.shields.io/badge/License-ISC-blue)
 
 ## Stack
 
@@ -39,4 +39,4 @@ git clone https://github.com/Fierillo/satoshillo.git
 
 ## Licencia
 
-[MIT](LICENSE)
+[ISC](LICENSE)

@@ -421,11 +421,26 @@ function scanSubtree(root) {
   }
 }
 
+let activeObserver = null;
+let activeInterval = null;
+
 function scanAndConvertPrices() {
+  chrome.runtime.sendMessage({ action: 'getDisabled' }, response => {
+    const disabled = response && response.disabled ? response.disabled : [];
+    const origin = window.location.origin;
+    if (disabled.includes(origin)) return;
+    startWatching();
+  });
+}
+
+function startWatching() {
+  if (activeObserver) activeObserver.disconnect();
+  if (activeInterval) clearInterval(activeInterval);
+
   pageLanguage = detectPageLanguage();
   scanSubtree(document.body);
 
-  const observer = new MutationObserver(mutations => {
+  activeObserver = new MutationObserver(mutations => {
     let pending = null;
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
@@ -437,10 +452,32 @@ function scanAndConvertPrices() {
     }
     if (pending) scheduleScan(pending);
   });
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  activeObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
 
-  setInterval(() => scanSubtree(document.body), 2000);
+  activeInterval = setInterval(() => scanSubtree(document.body), 2000);
 }
+
+function stopWatching() {
+  if (activeObserver) { activeObserver.disconnect(); activeObserver = null; }
+  if (activeInterval) { clearInterval(activeInterval); activeInterval = null; }
+}
+
+chrome.runtime.onMessage.addListener((request) => {
+  if (request.action === 'toggleDisabled') {
+    if (request.disabled) {
+      stopWatching();
+      document.querySelectorAll('.satoshillo-candidate').forEach(el => {
+        const firstChild = el.childNodes[0];
+        if (firstChild && firstChild.nodeType === Node.TEXT_NODE) {
+          el.parentNode.replaceChild(firstChild.cloneNode(true), el);
+        }
+      });
+      document.querySelectorAll('.satoshillo-menu').forEach(el => el.remove());
+    } else {
+      startWatching();
+    }
+  }
+});
 
 const style = document.createElement('style');
 style.textContent = `

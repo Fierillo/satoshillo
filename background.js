@@ -71,9 +71,49 @@ async function fetchBitcoinPrices() {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action !== 'getPrices') return;
-  fetchBitcoinPrices().then(prices => {
-    sendResponse({ prices });
+  if (request.action === 'getPrices') {
+    fetchBitcoinPrices().then(prices => {
+      sendResponse({ prices });
+    });
+    return true;
+  }
+  if (request.action === 'getDisabled') {
+    chrome.storage.local.get('disabledSites', data => {
+      const disabled = data.disabledSites || [];
+      sendResponse({ disabled });
+    });
+    return true;
+  }
+  if (request.action === 'toggleSite') {
+    const url = new URL(request.url);
+    const origin = url.origin;
+    chrome.storage.local.get('disabledSites', data => {
+      const disabled = data.disabledSites || [];
+      const idx = disabled.indexOf(origin);
+      if (idx === -1) disabled.push(origin);
+      else disabled.splice(idx, 1);
+      chrome.storage.local.set({ disabledSites: disabled }, () => {
+        sendResponse({ disabled, origin });
+      });
+    });
+    return true;
+  }
+});
+
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!tab.url) return;
+  const url = new URL(tab.url);
+  const origin = url.origin;
+  chrome.storage.local.get('disabledSites', data => {
+    const disabled = data.disabledSites || [];
+    const idx = disabled.indexOf(origin);
+    if (idx === -1) disabled.push(origin);
+    else disabled.splice(idx, 1);
+    chrome.storage.local.set({ disabledSites: disabled }, () => {
+      const isDisabled = disabled.includes(origin);
+      chrome.action.setBadgeText({ text: isDisabled ? 'OFF' : '', tabId: tab.id });
+      chrome.action.setBadgeBackgroundColor({ color: '#F44336', tabId: tab.id });
+      chrome.tabs.sendMessage(tab.id, { action: 'toggleDisabled', disabled: isDisabled });
+    });
   });
-  return true;
 });

@@ -19,8 +19,11 @@ The goal is to make Bitcoin the default unit of account in your daily browsing, 
 |------------|---------|
 | ![JS](https://img.shields.io/badge/JavaScript-raw?logo=javascript&logoColor=white&color=F7DF1E) | Extension logic (content script + background) |
 | ![Chrome](https://img.shields.io/badge/Chrome_Extension-raw?logo=googlechrome&logoColor=white&color=4285F4) | Platform (Manifest V3) |
-| ![CoinGecko](https://img.shields.io/badge/CoinGecko-API-raw?logo=bitcoin&logoColor=white&color=F7931A) | BTC/USD price feed |
+| ![CoinGecko](https://img.shields.io/badge/CoinGecko-API-raw?logo=bitcoin&logoColor=white&color=F7931A) | BTC price feed |
 | ![Yadio](https://img.shields.io/badge/Yadio-API-raw?color=6C63FF) | BTC/ARS price feed |
+| ![CoinCap](https://img.shields.io/badge/CoinCap-API-raw?color=1B1B1B) | BTC price feed |
+| ![Binance](https://img.shields.io/badge/Binance-API-raw?logo=binance&logoColor=white&color=F0B90B) | BTC price feed |
+| ![Kraken](https://img.shields.io/badge/Kraken-API-raw?color=7B61FF) | BTC price feed |
 | ![Pixel Art](https://img.shields.io/badge/Logo-Pixel_Art-raw?color=FF9800) | Satoshi symbol icons (Node.js) |
 
 ## Features
@@ -30,6 +33,7 @@ The goal is to make Bitcoin the default unit of account in your daily browsing, 
 - Floating menu with live conversion to sats / k sats / M sats / BTC
 - Currency inference by context (ARS / USD / EUR)
 - Localized number parsing (respects `.` `,` separators based on page language)
+- 5 price sources (CoinGecko, Yadio, CoinCap, Binance, Kraken) with robust averaging — if a source fails, the average adjusts automatically
 - Pixel-art Satoshi symbol logo
 
 ## Installation

@@ -1,5 +1,61 @@
 const CURRENCIES = ['ARS', 'USD', 'EUR', 'JPY'];
 
+const PRICE_TTL = 60000;
+
+let cachedPrices = null;
+let cachedAt = 0;
+let fetchPromise = null;
+
+function freshPrices() {
+  if (cachedPrices && Date.now() - cachedAt < PRICE_TTL) return cachedPrices;
+  return null;
+}
+
+function persistPrices() {
+  chrome.storage.local.set({ cachedPrices, cachedAt }).catch(() => {});
+}
+
+async function loadPersistedPrices() {
+  const data = await chrome.storage.local.get(['cachedPrices', 'cachedAt']).catch(() => ({}));
+  if (data && data.cachedPrices) {
+    cachedPrices = data.cachedPrices;
+    cachedAt = data.cachedAt || 0;
+  }
+}
+
+async function refreshPrices() {
+  if (fetchPromise) return fetchPromise;
+  fetchPromise = fetchBitcoinPrices()
+    .then(prices => {
+      fetchPromise = null;
+      if (prices) {
+        cachedPrices = prices;
+        cachedAt = Date.now();
+        persistPrices();
+      }
+      return prices;
+    })
+    .catch(() => {
+      fetchPromise = null;
+      return null;
+    });
+  return fetchPromise;
+}
+
+async function getPrices() {
+  const fresh = freshPrices();
+  if (fresh) {
+    if (Date.now() - cachedAt > PRICE_TTL / 2) refreshPrices();
+    return fresh;
+  }
+  const persisted = cachedPrices;
+  if (persisted) {
+    refreshPrices();
+    return persisted;
+  }
+  return refreshPrices();
+}
+
 const sources = [
   {
     name: 'CoinGecko',
@@ -72,7 +128,7 @@ async function fetchBitcoinPrices() {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getPrices') {
-    fetchBitcoinPrices().then(prices => {
+    getPrices().then(prices => {
       sendResponse({ prices });
     });
     return true;
@@ -132,6 +188,8 @@ chrome.action.onClicked.addListener(async (tab) => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
+  loadPersistedPrices().then(refreshPrices);
+  chrome.alarms.create('refreshPrices', { periodInMinutes: 1 });
   chrome.tabs.query({}, tabs => {
     for (const tab of tabs) {
       if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:')) {
@@ -142,4 +200,13 @@ chrome.runtime.onInstalled.addListener(() => {
       }
     }
   });
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  loadPersistedPrices().then(refreshPrices);
+  chrome.alarms.create('refreshPrices', { periodInMinutes: 1 });
+});
+
+chrome.alarms.onAlarm.addListener(alarm => {
+  if (alarm.name === 'refreshPrices') refreshPrices();
 });

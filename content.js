@@ -18,15 +18,21 @@ const CANDIDATE_PATTERN = new RegExp(
 
 let pageLanguage = 'en';
 
+function formatThousands(value) {
+  const parts = String(value).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
+}
+
 function formatSatoshis(satoshis) {
   if (satoshis >= satoshisPerBitcoin) {
     const btc = satoshis / satoshisPerBitcoin;
-    if (btc >= 100) return Math.round(btc) + ' BTC';
-    return btc.toFixed(2) + ' BTC';
+    if (btc >= 100) return formatThousands(Math.round(btc)) + ' BTC';
+    return formatThousands(btc.toFixed(2)) + ' BTC';
   }
-  if (satoshis >= 1000000) return (satoshis / 1000000).toFixed(1) + 'M sats';
-  if (satoshis >= 1000) return (satoshis / 1000).toFixed(1) + 'k sats';
-  return satoshis + ' sats';
+  if (satoshis >= 1000000) return formatThousands((satoshis / 1000000).toFixed(1)) + 'M sats';
+  if (satoshis >= 1000) return formatThousands((satoshis / 1000).toFixed(1)) + 'k sats';
+  return formatThousands(satoshis) + ' sats';
 }
 
 function calculateSatoshis(fiatAmount, currency, bitcoinPrice) {
@@ -37,6 +43,7 @@ function calculateSatoshis(fiatAmount, currency, bitcoinPrice) {
 
 let cachedPrices = null;
 let cachedAt = 0;
+let preloadTimer = null;
 
 function getPricesFromBackground() {
   if (cachedPrices && Date.now() - cachedAt < 60000) {
@@ -51,6 +58,40 @@ function getPricesFromBackground() {
       resolve(response.prices);
     });
   });
+}
+
+function hasFreshPrices() {
+  return !!cachedPrices && Date.now() - cachedAt < 60000;
+}
+
+function selectionActive() {
+  const sel = document.getSelection();
+  return !!sel && !sel.isCollapsed && sel.toString().length > 0;
+}
+
+function selectionIntersectsNode(node) {
+  if (!selectionActive()) return false;
+  const sel = document.getSelection();
+  const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+  if (!range) return false;
+  try {
+    return range.intersectsNode(node);
+  } catch {
+    return false;
+  }
+}
+
+function startPricePreload() {
+  if (preloadTimer) clearInterval(preloadTimer);
+  getPricesFromBackground();
+  preloadTimer = setInterval(() => getPricesFromBackground(), 60000);
+}
+
+function stopPricePreload() {
+  if (preloadTimer) {
+    clearInterval(preloadTimer);
+    preloadTimer = null;
+  }
 }
 
 function getScanBounds() {
@@ -88,6 +129,8 @@ const NEGATIVE_INDICATORS = [
   /\b(?:forex|fx|pair|trade|trading|position|margin|leverage|spread)\b/i,
   // Rate / yield
   /\b(?:rate|yield|basis\s*points?|bps)\b/i,
+  // Audience / metric counts
+  /\b(?:impresiones|impressions|vistas|views|visualizaciones|usuarios|users|seguidores|followers|suscriptores|subscribers|lectores|readers|miembros|members|audiencia|audience|reproducciones|plays|descargas|downloads|participantes|attendees|registros|signups|menciones|mentions|hits|clicks|clics)\b/i,
   // Spanish equivalents
   /\b(?:par|índice|vela|soporte|resistencia|ruptura|tendencia|pip|punto|dato|informe|economía|económico|desempleo|empleo|subió|bajó|cayó|suba|baja)\b/i
 ];
@@ -220,8 +263,10 @@ function parseCandidate(raw, context) {
     if (word === 'ars' || word === 'pesos') currencyHint = 'ARS';
     else if (word === 'eur' || word === 'euros') currencyHint = 'EUR';
     else currencyHint = 'USD';
-  } else if (normalized.startsWith('€')) {
+  } else if (/€/.test(normalized)) {
     currencyHint = 'EUR';
+  } else if (/\$/.test(normalized)) {
+    currencyHint = 'USD';
   }
   const hasCurrencyWord = currencyHint !== null;
   const hasSymbol = /[$€]/.test(normalized);
@@ -278,6 +323,20 @@ function removeExistingMenus() {
   document.querySelectorAll('.satoshillo-menu').forEach(menu => menu.remove());
 }
 
+function removeAllUi() {
+  document.querySelectorAll('.satoshillo-candidate').forEach(el => {
+    const firstChild = el.childNodes[0];
+    if (firstChild && firstChild.nodeType === Node.TEXT_NODE) {
+      el.parentNode.replaceChild(firstChild.cloneNode(true), el);
+    } else {
+      el.remove();
+    }
+  });
+  document.querySelectorAll('.satoshillo-menu').forEach(menu => menu.remove());
+  activeCandidate = null;
+  activeAnchor = null;
+}
+
 function hideResult(candidate) {
   const result = candidate.querySelector('.satoshillo-result');
   if (result) result.remove();
@@ -300,17 +359,17 @@ function buildCandidateSpan(raw, amount, currency) {
   span.dataset.amount = amount;
   span.dataset.currency = currency;
   span.appendChild(document.createTextNode(raw));
-  span.appendChild(createFloatButton(span));
+  span.appendChild(createFloatButton());
   return span;
 }
 
-function createFloatButton(candidate) {
+function createFloatButton() {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'satoshillo-float';
   button.title = 'ARS / USD / EUR';
   button.addEventListener('mouseenter', () => {
-    openCurrencyMenu(button, candidate);
+    openCurrencyMenu(button, button.parentNode);
   });
   return button;
 }
@@ -357,9 +416,13 @@ async function openCurrencyMenu(anchor, candidate) {
   };
 
   render(null, true);
-  getPricesWithAttempts().then(prices => {
-    render(prices, false);
-  });
+  if (hasFreshPrices()) {
+    render(cachedPrices, false);
+  } else {
+    getPricesWithAttempts().then(prices => {
+      render(prices, false);
+    });
+  }
 }
 
 async function selectCurrency(candidate, currency) {
@@ -428,7 +491,11 @@ function hasForexPairInSentence(text, index) {
   const pairMatch = sentence.match(FOREX_PAIR_REGEX);
   if (!pairMatch) return false;
   const pairIndex = sentence.indexOf(pairMatch[0]);
-  const wordDist = sentence.slice(0, index - before).split(/\s+/).length;
+  const pairEnd = pairIndex + pairMatch[0].length;
+  const relIndex = index - before;
+  if (pairEnd > relIndex) return false;
+  const between = sentence.slice(pairEnd, relIndex);
+  const wordDist = between.split(/\s+/).filter(Boolean).length;
   return wordDist <= 6;
 }
 
@@ -441,24 +508,27 @@ function isInEditableContext(node) {
   return false;
 }
 
+function getMergedMatches(text, context) {
+  const candidateMatches = [...text.matchAll(CANDIDATE_PATTERN)];
+  const ctxLower = context.toLowerCase();
+  const ctxIndex = ctxLower.indexOf(text.toLowerCase());
+  if (ctxIndex === -1 || !hasForexPairNear(ctxLower, ctxIndex, 80)) return candidateMatches;
+  const ranges = candidateMatches.map(m => [m.index, m.index + m[0].length]);
+  const extra = [...text.matchAll(BARE_NUMBER_PATTERN)].filter(b => {
+    return !ranges.some(([s, e]) => b.index < e && b.index + b[0].length > s);
+  });
+  return candidateMatches.concat(extra).sort((a, b) => a.index - b.index);
+}
+
 function processTextNode(node) {
   if (isInEditableContext(node)) return;
+  if (selectionIntersectsNode(node)) return;
   const parentTag = node.parentNode && node.parentNode.tagName;
   if (parentTag === 'SCRIPT' || parentTag === 'STYLE' || parentTag === 'TEXTAREA') return;
   const text = node.textContent;
   if (!text) return;
-  let matches = [...text.matchAll(CANDIDATE_PATTERN)];
-
   const context = getAncestorContext(node);
-
-  if (matches.length === 0 && context) {
-    const textLower = text.toLowerCase();
-    const ctxLower = context.toLowerCase();
-    const ctxIndex = ctxLower.indexOf(textLower);
-    if (ctxIndex !== -1 && hasForexPairNear(ctxLower, ctxIndex, 80)) {
-      matches = [...text.matchAll(BARE_NUMBER_PATTERN)];
-    }
-  }
+  const matches = getMergedMatches(text, context);
 
   if (matches.length === 0) return;
   const fragment = document.createDocumentFragment();
@@ -485,20 +555,11 @@ function processTextNode(node) {
 
 function processContainer(element) {
   if (isInEditableContext(element)) return;
+  if (selectionIntersectsNode(element)) return;
   const text = element.textContent;
   if (!text) return;
-  let matches = [...text.matchAll(CANDIDATE_PATTERN)];
-
   const context = element.parentNode ? element.parentNode.textContent : text;
-
-  if (matches.length === 0 && context) {
-    const textLower = text.toLowerCase();
-    const ctxLower = context.toLowerCase();
-    const ctxIndex = ctxLower.indexOf(textLower);
-    if (ctxIndex !== -1 && hasForexPairNear(ctxLower, ctxIndex, 80)) {
-      matches = [...text.matchAll(BARE_NUMBER_PATTERN)];
-    }
-  }
+  const matches = getMergedMatches(text, context);
 
   if (matches.length === 0) return;
   const fragment = document.createDocumentFragment();
@@ -523,11 +584,13 @@ function processContainer(element) {
   element.replaceChildren(fragment);
 }
 
+const SATOSHILLO_SELECTOR = '.satoshillo-candidate, .satoshillo-result, .satoshillo-float, .satoshillo-menu, .satoshillo-option';
+
 function isInsideSatoshillo(node) {
   if (node.nodeType === Node.TEXT_NODE) {
-    return node.parentNode ? node.parentNode.closest('.satoshillo-candidate, .satoshillo-result, .satoshillo-menu, .satoshillo-option') : false;
+    return node.parentNode ? node.parentNode.closest(SATOSHILLO_SELECTOR) : false;
   }
-  return node.closest ? node.closest('.satoshillo-candidate, .satoshillo-result, .satoshillo-menu, .satoshillo-option') : false;
+  return node.closest ? node.closest(SATOSHILLO_SELECTOR) : false;
 }
 
 function isLeafTextContainer(element) {
@@ -592,6 +655,7 @@ function startWatching() {
   if (activeInterval) clearInterval(activeInterval);
 
   pageLanguage = detectPageLanguage();
+  startPricePreload();
   scanSubtree(document.body);
 
   activeObserver = new MutationObserver(mutations => {
@@ -608,25 +672,22 @@ function startWatching() {
   });
   activeObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
 
-  activeInterval = setInterval(() => scanSubtree(document.body), 2000);
+  activeInterval = setInterval(() => {
+    if (!selectionActive()) scanSubtree(document.body);
+  }, 2000);
 }
 
 function stopWatching() {
   if (activeObserver) { activeObserver.disconnect(); activeObserver = null; }
   if (activeInterval) { clearInterval(activeInterval); activeInterval = null; }
+  stopPricePreload();
 }
 
 chrome.runtime.onMessage.addListener((request) => {
   if (request.action === 'toggleDisabled') {
     if (request.disabled) {
       stopWatching();
-      document.querySelectorAll('.satoshillo-candidate').forEach(el => {
-        const firstChild = el.childNodes[0];
-        if (firstChild && firstChild.nodeType === Node.TEXT_NODE) {
-          el.parentNode.replaceChild(firstChild.cloneNode(true), el);
-        }
-      });
-      document.querySelectorAll('.satoshillo-menu').forEach(el => el.remove());
+      removeAllUi();
     } else {
       startWatching();
     }
@@ -646,7 +707,7 @@ style.textContent = `
   .satoshillo-option:hover { background: #f0f0f0 !important; }
   .satoshillo-result.satoshillo-error { color: #999 !important; border-color: #ccc !important; background: #fafafa !important; }
   .satoshillo-selected { font-weight: 700; }
-  .satoshillo-result { position: absolute; left: 0; top: -1.2em; white-space: nowrap; font-size: 10px; font-weight: 600; line-height: 1; color: #f7931a; background: #fff; border: 1px solid #f7931a; border-radius: 3px; padding: 1px 3px; pointer-events: none; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .satoshillo-result { position: absolute; left: 0; top: -1.2em; white-space: nowrap; font-size: 10px; font-weight: 600; line-height: 1; color: #f7931a; background: #fff; border: 1px solid #f7931a; border-radius: 3px; padding: 1px 3px; pointer-events: none; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 `;
 document.head.appendChild(style);
 
@@ -665,6 +726,7 @@ document.addEventListener('mousemove', e => {
 
 window.addEventListener('scroll', () => {
   removeExistingMenus();
+  if (activeCandidate) closeActive();
 }, { capture: true, passive: true });
 
 scanAndConvertPrices();

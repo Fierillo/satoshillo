@@ -1,135 +1,118 @@
+if (typeof SatoshilloPriceService === 'undefined') importScripts('price-service.js');
+
 const CURRENCIES = ['ARS', 'USD', 'EUR', 'JPY'];
 
-const PRICE_TTL = 60000;
-
-let cachedPrices = null;
-let cachedAt = 0;
-let fetchPromise = null;
-
-function freshPrices() {
-  if (cachedPrices && Date.now() - cachedAt < PRICE_TTL) return cachedPrices;
-  return null;
+function storageGet(keys) {
+  return new Promise(resolve => {
+    chrome.storage.local.get(keys, data => resolve(data || {}));
+  });
 }
 
-function persistPrices() {
-  chrome.storage.local.set({ cachedPrices, cachedAt }).catch(() => {});
+function storageSet(value) {
+  return new Promise(resolve => {
+    chrome.storage.local.set(value, resolve);
+  });
 }
 
-async function loadPersistedPrices() {
-  const data = await chrome.storage.local.get(['cachedPrices', 'cachedAt']).catch(() => ({}));
-  if (data && data.cachedPrices) {
-    cachedPrices = data.cachedPrices;
-    cachedAt = data.cachedAt || 0;
-  }
+async function fetchJson(url, signal) {
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error('HTTP ' + response.status);
+  return response.json();
 }
 
-async function refreshPrices() {
-  if (fetchPromise) return fetchPromise;
-  fetchPromise = fetchBitcoinPrices()
-    .then(prices => {
-      fetchPromise = null;
-      if (prices) {
-        cachedPrices = prices;
-        cachedAt = Date.now();
-        persistPrices();
-      }
-      return prices;
-    })
-    .catch(() => {
-      fetchPromise = null;
-      return null;
+function fromUsd(usd, rates) {
+  return {
+    USD: usd,
+    ARS: usd * rates.ARS,
+    EUR: usd * rates.EUR,
+    JPY: usd * rates.JPY
+  };
+}
+
+function createCachedLoader(ttlMs, load) {
+  let value = null;
+  let loadedAt = 0;
+  let pending = null;
+  return async signal => {
+    if (value && Date.now() - loadedAt < ttlMs) return value;
+    if (pending) return pending;
+    pending = load(signal).then(result => {
+      value = result;
+      loadedAt = Date.now();
+      return result;
+    }).finally(() => {
+      pending = null;
     });
-  return fetchPromise;
+    return pending;
+  };
 }
 
-async function getPrices() {
-  const fresh = freshPrices();
-  if (fresh) {
-    if (Date.now() - cachedAt > PRICE_TTL / 2) refreshPrices();
-    return fresh;
-  }
-  const persisted = cachedPrices;
-  if (persisted) {
-    refreshPrices();
-    return persisted;
-  }
-  return refreshPrices();
-}
+const loadFxRatesApi = createCachedLoader(5 * 60000, async signal => {
+  const data = await fetchJson('https://api.fxratesapi.com/latest?base=USD&currencies=ARS,EUR,JPY', signal);
+  if (!data.success || !data.rates) throw new Error('Invalid FXRatesAPI response');
+  return data.rates;
+});
+
+const loadExchangeRateApi = createCachedLoader(60 * 60000, async signal => {
+  const data = await fetchJson('https://open.er-api.com/v6/latest/USD', signal);
+  if (data.result !== 'success' || !data.rates) throw new Error('Invalid ExchangeRate-API response');
+  return data.rates;
+});
 
 const sources = [
   {
     name: 'CoinGecko',
-    fetch: async () => {
-      const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=ars,usd,eur,jpy');
-      if (!r.ok) return null;
-      const d = await r.json();
+    fetch: async signal => {
+      const d = await fetchJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=ars,usd,eur,jpy&include_last_updated_at=true', signal);
       return { ARS: d.bitcoin.ars, USD: d.bitcoin.usd, EUR: d.bitcoin.eur, JPY: d.bitcoin.jpy };
     }
   },
   {
     name: 'Yadio',
-    fetch: async () => {
-      const r = await fetch('https://api.yadio.io/exrates/BTC');
-      if (!r.ok) return null;
-      const d = await r.json();
+    fetch: async signal => {
+      const d = await fetchJson('https://api.yadio.io/exrates/BTC', signal);
       return { ARS: d.BTC.ARS, USD: d.BTC.USD, EUR: d.BTC.EUR, JPY: d.BTC.JPY };
     }
   },
   {
-    name: 'CoinCap',
-    fetch: async () => {
-      const r = await fetch('https://api.coincap.io/v2/assets/bitcoin');
-      if (!r.ok) return null;
-      const d = await r.json();
-      const usd = parseFloat(d.data.priceUsd);
-      return { USD: usd, EUR: usd * 0.92, ARS: usd * 1050, JPY: usd * 155 };
+    name: 'Binance + FXRatesAPI',
+    fetch: async signal => {
+      const [ticker, rates] = await Promise.all([
+        fetchJson('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', signal),
+        loadFxRatesApi(signal)
+      ]);
+      return fromUsd(parseFloat(ticker.price), rates);
     }
   },
   {
-    name: 'Binance',
-    fetch: async () => {
-      const r = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
-      if (!r.ok) return null;
-      const d = await r.json();
-      const usd = parseFloat(d.price);
-      return { USD: usd, EUR: usd * 0.92, ARS: usd * 1050, JPY: usd * 155 };
-    }
-  },
-  {
-    name: 'Kraken',
-    fetch: async () => {
-      const r = await fetch('https://api.kraken.com/0/public/Ticker?pair=XBTUSD');
-      if (!r.ok) return null;
-      const d = await r.json();
-      const usd = parseFloat(d.result.XBTUSD.c[0]);
-      return { USD: usd, EUR: usd * 0.92, ARS: usd * 1050, JPY: usd * 155 };
+    name: 'Kraken + ExchangeRate-API',
+    fetch: async signal => {
+      const [ticker, rates] = await Promise.all([
+        fetchJson('https://api.kraken.com/0/public/Ticker?pair=XBTUSD&assetVersion=1', signal),
+        loadExchangeRateApi(signal)
+      ]);
+      if (ticker.error && ticker.error.length) throw new Error(ticker.error.join(', '));
+      const pair = Object.values(ticker.result || {})[0];
+      if (!pair || !pair.c) throw new Error('Invalid Kraken response');
+      return fromUsd(parseFloat(pair.c[0]), rates);
     }
   }
 ];
 
-async function fetchBitcoinPrices() {
-  const results = await Promise.allSettled(sources.map(s => s.fetch()));
-
-  const prices = {};
-  CURRENCIES.forEach(currency => {
-    const values = [];
-    results.forEach((result, i) => {
-      if (result.status === 'fulfilled' && result.value && typeof result.value[currency] === 'number' && !isNaN(result.value[currency])) {
-        values.push(result.value[currency]);
-      }
-    });
-    if (values.length > 0) {
-      prices[currency] = values.reduce((a, b) => a + b, 0) / values.length;
-    }
-  });
-
-  return Object.keys(prices).length > 0 ? prices : null;
-}
+const priceService = SatoshilloPriceService.createPriceService({
+  currencies: CURRENCIES,
+  sources,
+  storage: { get: storageGet, set: storageSet },
+  ttlMs: 60000,
+  sourceTimeoutMs: 7000,
+  quorum: 3,
+  maxDeviation: 0.15
+});
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getPrices') {
-    getPrices().then(prices => {
-      sendResponse({ prices });
+    priceService.getPrices().then(result => {
+      sendResponse(result);
     });
     return true;
   }
@@ -188,14 +171,14 @@ chrome.action.onClicked.addListener(async (tab) => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  loadPersistedPrices().then(refreshPrices);
+  priceService.refreshPrices();
   chrome.alarms.create('refreshPrices', { periodInMinutes: 1 });
   chrome.tabs.query({}, tabs => {
     for (const tab of tabs) {
       if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:')) {
         chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          files: ['content.js']
+          files: ['price-parser.js', 'content.js']
         }).catch(() => {});
       }
     }
@@ -203,10 +186,10 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  loadPersistedPrices().then(refreshPrices);
+  priceService.refreshPrices();
   chrome.alarms.create('refreshPrices', { periodInMinutes: 1 });
 });
 
 chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === 'refreshPrices') refreshPrices();
+  if (alarm.name === 'refreshPrices') priceService.refreshPrices();
 });

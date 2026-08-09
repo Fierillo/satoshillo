@@ -1,6 +1,6 @@
 # Satoshillo
 
-A browser extension that converts ARS, USD, and EUR prices to satoshis in real time on any website.
+A browser extension that converts ARS, USD, EUR, and JPY prices to satoshis in real time on any website.
 
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-F44336?logo=googlechrome&logoColor=white)
 ![Firefox Add-on](https://img.shields.io/badge/Firefox-Add--on-FF7139?logo=firefox&logoColor=white)
@@ -22,22 +22,48 @@ The goal is to make Bitcoin the default unit of account in your daily browsing, 
 | ![Manifest V3](https://img.shields.io/badge/Manifest_V3-raw?logo=google&logoColor=white&color=4285F4) | Cross-browser extension platform |
 | ![CoinGecko](https://img.shields.io/badge/CoinGecko-API-raw?logo=bitcoin&logoColor=white&color=F7931A) | BTC price feed |
 | ![Yadio](https://img.shields.io/badge/Yadio-API-raw?color=6C63FF) | BTC/ARS price feed |
-| ![CoinCap](https://img.shields.io/badge/CoinCap-API-raw?color=1B1B1B) | BTC price feed |
 | ![Binance](https://img.shields.io/badge/Binance-API-raw?logo=binance&logoColor=white&color=F0B90B) | BTC price feed |
 | ![Kraken](https://img.shields.io/badge/Kraken-API-raw?color=7B61FF) | BTC price feed |
+| FXRatesAPI / ExchangeRate-API | Live fiat exchange rates |
 | ![Pixel Art](https://img.shields.io/badge/Logo-Pixel_Art-raw?color=FF9800) | Satoshi symbol icons (Node.js) |
 
 ## Features
 
 - Detects prices on any webpage (with `$`/`€` symbols, currency words, or magnitudes like `76M`, `2.4B`)
-- Word magnitudes: `1 million`, `50 billion`, `1 trillion`, `1 mill`, `1 bill`
+- Word magnitudes: `1 million`, `50 billion`, `1 trillion`
 - Forex pair detection: `USD/JPY 158.48`, `EUR/USD 1.0850`
 - Floating menu with live conversion to sats / k sats / M sats / BTC
-- Currency inference by context (ARS / USD / EUR / forex quote currency)
+- Deterministic currency inference from the local sentence (ARS / USD / EUR / JPY)
 - Localized number parsing (respects `.` `,` separators based on page language)
+- One DOM extraction per semantic block; no periodic rescanning or site-specific rules
 - Toggle per site: click the icon to disable on any domain (badge shows "OFF")
-- 5 price sources (CoinGecko, Yadio, CoinCap, Binance, Kraken) with robust averaging — if a source fails, the average adjusts automatically
+- 4 real-rate routes per currency: CoinGecko, Yadio, Binance + FXRatesAPI, and Kraken + ExchangeRate-API
+- Minimum quorum of 3 sources with median-based outlier rejection; no fixed fiat multipliers
+- Automated parser, aggregation, timeout, and cache-lifecycle tests with Node's built-in test runner
 - Pixel-art Satoshi symbol logo
+
+## Price detection
+
+Satoshillo uses one deterministic pipeline instead of page-specific heuristics:
+
+1. Extract visible text once from each semantic block and preserve DOM offsets.
+2. Scan numeric tokens and segment the text into sentences and clauses with `Intl.Segmenter`.
+3. Classify each number from structural monetary evidence: symbols/currency words, valid forex syntax, or a magnitude connected to a monetary sentence.
+4. Check adjacent sentences only when the number is isolated. Ambiguous values are ignored.
+5. Map accepted numbers back to their exact text nodes, including layouts split across multiple spans.
+
+Dynamic content is handled by a debounced `MutationObserver`. The observer is disconnected while Satoshillo updates the DOM, preventing self-triggered scan loops.
+
+## Exchange rates
+
+Every supported currency (ARS, USD, EUR, JPY) has four real-rate routes:
+
+- CoinGecko direct BTC/fiat prices.
+- Yadio direct BTC/fiat prices.
+- Binance BTC/USDT combined with live FXRatesAPI rates.
+- Kraken BTC/USD combined with live ExchangeRate-API rates.
+
+A price requires at least three agreeing sources. Values are centered on the median, outliers beyond 15% are discarded, and no fixed fiat multipliers are used. Rates are cached globally, persisted across browser sessions, refreshed every minute, and served as provisional values if the network is temporarily unavailable.
 
 ## Installation
 
@@ -53,6 +79,12 @@ The goal is to make Bitcoin the default unit of account in your daily browsing, 
 git clone https://github.com/Fierillo/satoshillo.git
 cd satoshillo
 node build.js
+```
+
+Run the automated tests with:
+
+```bash
+npm test
 ```
 
 This generates browser-specific builds in `dist/`:

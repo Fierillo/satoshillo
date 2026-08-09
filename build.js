@@ -10,7 +10,7 @@ const browsers = {
   edge: {},
   brave: {},
   firefox: {
-    background: { scripts: ['background.js'] }
+    background: { scripts: ['price-service.js', 'background.js'] }
   }
 };
 
@@ -21,7 +21,7 @@ for (const [browser, overrides] of Object.entries(browsers)) {
   const manifest = { ...base, ...overrides };
   fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
-  for (const f of ['content.js', 'background.js']) {
+  for (const f of ['content.js', 'background.js', 'price-parser.js', 'price-service.js']) {
     fs.copyFileSync(path.join(__dirname, f), path.join(dir, f));
   }
 

@@ -61,27 +61,10 @@ const loadExchangeRateApi = createCachedLoader(60 * 60000, async signal => {
 
 const sources = [
   {
-    name: 'CoinGecko',
-    fetch: async signal => {
-      const d = await fetchJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=ars,usd,eur,jpy&include_last_updated_at=true', signal);
-      return { ARS: d.bitcoin.ars, USD: d.bitcoin.usd, EUR: d.bitcoin.eur, JPY: d.bitcoin.jpy };
-    }
-  },
-  {
     name: 'Yadio',
     fetch: async signal => {
       const d = await fetchJson('https://api.yadio.io/exrates/BTC', signal);
       return { ARS: d.BTC.ARS, USD: d.BTC.USD, EUR: d.BTC.EUR, JPY: d.BTC.JPY };
-    }
-  },
-  {
-    name: 'Binance + FXRatesAPI',
-    fetch: async signal => {
-      const [ticker, rates] = await Promise.all([
-        fetchJson('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', signal),
-        loadFxRatesApi(signal)
-      ]);
-      return fromUsd(parseFloat(ticker.price), rates);
     }
   },
   {
@@ -96,6 +79,16 @@ const sources = [
       if (!pair || !pair.c) throw new Error('Invalid Kraken response');
       return fromUsd(parseFloat(pair.c[0]), rates);
     }
+  },
+  {
+    name: 'Binance + FXRatesAPI',
+    fetch: async signal => {
+      const [ticker, rates] = await Promise.all([
+        fetchJson('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', signal),
+        loadFxRatesApi(signal)
+      ]);
+      return fromUsd(parseFloat(ticker.price), rates);
+    }
   }
 ];
 
@@ -105,8 +98,7 @@ const priceService = SatoshilloPriceService.createPriceService({
   storage: { get: storageGet, set: storageSet },
   ttlMs: 60000,
   sourceTimeoutMs: 7000,
-  quorum: 3,
-  maxDeviation: 0.15
+  strategyVersion: 'priority-v1'
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

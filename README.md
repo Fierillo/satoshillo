@@ -20,8 +20,7 @@ The goal is to make Bitcoin the default unit of account in your daily browsing, 
 |------------|---------|
 | ![JS](https://img.shields.io/badge/JavaScript-raw?logo=javascript&logoColor=white&color=F7DF1E) | Extension logic (content script + background) |
 | ![Manifest V3](https://img.shields.io/badge/Manifest_V3-raw?logo=google&logoColor=white&color=4285F4) | Cross-browser extension platform |
-| ![CoinGecko](https://img.shields.io/badge/CoinGecko-API-raw?logo=bitcoin&logoColor=white&color=F7931A) | BTC price feed |
-| ![Yadio](https://img.shields.io/badge/Yadio-API-raw?color=6C63FF) | BTC/ARS price feed |
+| ![Yadio](https://img.shields.io/badge/Yadio-API-raw?color=6C63FF) | Primary BTC/fiat price feed |
 | ![Binance](https://img.shields.io/badge/Binance-API-raw?logo=binance&logoColor=white&color=F0B90B) | BTC price feed |
 | ![Kraken](https://img.shields.io/badge/Kraken-API-raw?color=7B61FF) | BTC price feed |
 | FXRatesAPI / ExchangeRate-API | Live fiat exchange rates |
@@ -37,9 +36,9 @@ The goal is to make Bitcoin the default unit of account in your daily browsing, 
 - Localized number parsing (respects `.` `,` separators based on page language)
 - One DOM extraction per semantic block; no periodic rescanning or site-specific rules
 - Toggle per site: click the icon to disable on any domain (badge shows "OFF")
-- 4 real-rate routes per currency: CoinGecko, Yadio, Binance + FXRatesAPI, and Kraken + ExchangeRate-API
-- Minimum quorum of 3 sources with median-based outlier rejection; no fixed fiat multipliers
-- Automated parser, aggregation, timeout, and cache-lifecycle tests with Node's built-in test runner
+- Priority-based real-rate routes: Yadio, Kraken + ExchangeRate-API, then Binance + FXRatesAPI
+- One complete source per update; no averaging and no fixed fiat multipliers
+- Automated parser, fallback selection, timeout, and cache-lifecycle tests with Node's built-in test runner
 - Pixel-art Satoshi symbol logo
 
 ## Price detection
@@ -56,14 +55,13 @@ Dynamic content is handled by a debounced `MutationObserver`. The observer is di
 
 ## Exchange rates
 
-Every supported currency (ARS, USD, EUR, JPY) has four real-rate routes:
+Every update uses one complete source for all supported currencies (ARS, USD, EUR, JPY), following this priority:
 
-- CoinGecko direct BTC/fiat prices.
-- Yadio direct BTC/fiat prices.
-- Binance BTC/USDT combined with live FXRatesAPI rates.
-- Kraken BTC/USD combined with live ExchangeRate-API rates.
+- Yadio direct BTC/fiat prices (primary).
+- Kraken BTC/USD combined with live ExchangeRate-API rates (first fallback).
+- Binance BTC/USDT combined with live FXRatesAPI rates (second fallback).
 
-A price requires at least three agreeing sources. Values are centered on the median, outliers beyond 15% are discarded, and no fixed fiat multipliers are used. Rates are cached globally, persisted across browser sessions, refreshed every minute, and served as provisional values if the network is temporarily unavailable.
+Sources are never averaged or mixed: the first route returning all four valid rates wins. No fixed fiat multipliers are used. Rates are cached globally, persisted across browser sessions, refreshed every minute, and served as provisional values if the network is temporarily unavailable.
 
 ## Installation
 

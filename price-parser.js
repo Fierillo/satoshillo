@@ -156,6 +156,11 @@
       (/^\d{4}$/.test(token.raw) && Number(token.raw) >= 1900 && Number(token.raw) <= 2099);
   }
 
+  function isOrderedListMarker(text, token) {
+    const lineStart = text.lastIndexOf('\n', token.start - 1) + 1;
+    return /^\s*$/.test(text.slice(lineStart, token.start)) && /^\.\s/.test(text.slice(token.end));
+  }
+
   function forexRelation(clause, token, text, magnitude) {
     if (isDateToken(text, token)) return null;
     if (magnitude.multiplier > 1) return null;
@@ -243,6 +248,7 @@
     const clauses = splitClauses(text, fallbackLocale);
     const candidates = [];
     for (const token of scanNumbers(text)) {
+      if (isOrderedListMarker(text, token)) continue;
       const clauseIndex = clauses.findIndex(clause => token.start >= clause.start && token.end <= clause.end);
       if (clauseIndex === -1) continue;
       const candidate = classifyNumber(text, token, clauses[clauseIndex], clauses, clauseIndex, fallbackLocale);

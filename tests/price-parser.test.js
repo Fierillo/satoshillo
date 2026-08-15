@@ -46,6 +46,14 @@ test('uses an adjacent sentence only for an isolated number', () => {
   assert.deepEqual(compact('$\n100 users', 'en'), []);
 });
 
+test('ignores ordered-list markers without hiding prices in list items', () => {
+  const text = '1. Precio del producto: $10\n  2. Costo de envío: $5';
+  assert.deepEqual(compact(text, 'es'), [
+    { raw: '$10', amount: 10, currency: 'ARS', start: text.indexOf('$10') },
+    { raw: '$5', amount: 5, currency: 'ARS', start: text.indexOf('$5') }
+  ]);
+});
+
 test('rejects malformed grouping', () => {
   assert.ok(Number.isNaN(parseLocalizedNumber('1,23,456', 'en')));
   assert.ok(Number.isNaN(parseLocalizedNumber('1.23.456', 'es')));

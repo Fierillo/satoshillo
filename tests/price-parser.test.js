@@ -140,6 +140,13 @@ test('parses three-digit grouping on explicit symbol amounts', () => {
   ]);
 });
 
+test('parses three-digit grouping before a magnitude and currency code', () => {
+  const text = '+6,400M USD por RIGI.';
+  assert.deepEqual(compact(text, 'es'), [
+    { raw: '6,400M USD', amount: 6400000000, currency: 'USD', start: text.indexOf('6,400') }
+  ]);
+});
+
 test('multiple forex pairs do not duplicate one rate', () => {
   const text = 'EUR/USD and GBP/USD at 1.2';
   assert.deepEqual(compact(text), [

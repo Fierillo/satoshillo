@@ -208,7 +208,7 @@
     const symbol = symbolRelation(text, token, fallbackLocale, clause);
     const currency = currencyRelation(text, token, magnitude.end, clause);
     const numberLocale = forex ? 'en' : locale;
-    const baseAmount = /^un$/i.test(token.raw) ? 1 : parseLocalizedNumber(token.raw, numberLocale, !!symbol);
+    const baseAmount = /^un$/i.test(token.raw) ? 1 : parseLocalizedNumber(token.raw, numberLocale, !!(symbol || currency));
     const amount = baseAmount * magnitude.multiplier;
     if (!Number.isFinite(amount) || amount <= 0) return null;
     if (forex) return { ...forex, raw: text.slice(forex.start, forex.end), amount, numberStart: token.start, numberEnd: token.end, evidence: 'forex' };

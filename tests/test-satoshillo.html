@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Satoshillo - Test Suite</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 1180px; margin: 40px auto; padding: 0 20px; background: #fafafa; }
+    h1 { color: #f7931a; }
+    .legend { background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 6px; margin-bottom: 25px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 25px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+    th { background: #f7931a; color: #fff; }
+    tr:hover { background: #fff7ed; }
+    .candidate { font-family: monospace; background: #fff3e0; padding: 2px 6px; border-radius: 3px; }
+    .expected { width: 100%; min-width: 150px; box-sizing: border-box; border: 0; background: transparent; font: 12px monospace; color: inherit; }
+    input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+    .error-row { background: #ffebee !important; }
+    .exp-yes { color: #4caf50; font-weight: bold; }
+    .exp-no { color: #f44336; font-weight: bold; }
+    .stats { display: flex; gap: 20px; margin-bottom: 15px; font-size: 14px; }
+    .stat { padding: 8px 15px; border-radius: 6px; }
+    .stat-pass { background: #e8f5e9; }
+    .stat-fail { background: #ffebee; }
+    #feedback { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 12px; white-space: pre-wrap; display: none; margin-top: 15px; }
+  </style>
+</head>
+<body>
+
+<h1>Satoshillo - Test Suite</h1>
+
+<div class="legend">
+  Verificar si el valor resaltado aparece según lo esperado y marcar Error cuando no coincida. La prueba debe abrirse con Satoshillo habilitado para archivos locales.
+</div>
+
+<div class="stats">
+  <div class="stat stat-pass">Sin error: <strong id="passedTests">50</strong></div>
+  <div class="stat stat-fail">Errores: <strong id="failedTests">0</strong></div>
+</div>
+
+<table id="tests">
+  <tr><th>#</th><th>Ejemplo</th><th>Esperado</th><th>Interpretado</th><th>Error</th></tr>
+  <tr><td>1</td><td>Buy this laptop for <span class="candidate">$1,500</span></td><td><input readonly class="expected exp-yes" value="1500 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="1"></td></tr>
+  <tr><td>2</td><td>USD/JPY dropped from <span class="candidate">158.48</span> to 156.65</td><td><input readonly class="expected exp-yes" value="158.48 JPY"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="2"></td></tr>
+  <tr><td>3</td><td>El precio es de <span class="candidate">500 pesos</span></td><td><input readonly class="expected exp-yes" value="500 ARS"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="3"></td></tr>
+  <tr><td>4</td><td>The economy lost <span class="candidate">23,000</span> jobs</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="4"></td></tr>
+  <tr><td>5</td><td>Total a pagar: <span class="candidate">$2.50</span></td><td><input readonly class="expected exp-yes" value="2.5 ARS"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="5"></td></tr>
+  <tr><td>6</td><td>The DXY fell from <span class="candidate">99.90</span> to 99.40</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="6"></td></tr>
+  <tr><td>7</td><td>El producto cuesta <span class="candidate">€49,99</span></td><td><input readonly class="expected exp-yes" value="49.99 EUR"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="7"></td></tr>
+  <tr><td>8</td><td>The index gained <span class="candidate">180</span> points</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="8"></td></tr>
+  <tr><td>9</td><td>La suscripción sale <span class="candidate">$9.99</span> al mes</td><td><input readonly class="expected exp-yes" value="9.99 ARS"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="9"></td></tr>
+  <tr><td>10</td><td>El dólar blue cotiza a <span class="candidate">$1.200</span></td><td><input readonly class="expected exp-yes" value="1200 ARS"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="10"></td></tr>
+  <tr><td>11</td><td>Se perdieron <span class="candidate">85,000</span> puestos de trabajo</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="11"></td></tr>
+  <tr><td>12</td><td>The price dropped to <span class="candidate">$2.50</span> after the crash</td><td><input readonly class="expected exp-yes" value="2.5 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="12"></td></tr>
+  <tr><td>13</td><td>EUR/USD is trading at <span class="candidate">1.0850</span></td><td><input readonly class="expected exp-yes" value="1.085 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="13"></td></tr>
+  <tr><td>14</td><td>El presupuesto es de <span class="candidate">1 millón de pesos</span></td><td><input readonly class="expected exp-yes" value="1000000 ARS"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="14"></td></tr>
+  <tr><td>15</td><td>El artículo <span class="candidate">1.500</span> del catálogo cuesta $25</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="15"></td></tr>
+  <tr><td>16</td><td>You owe me <span class="candidate">€20</span></td><td><input readonly class="expected exp-yes" value="20 EUR"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="16"></td></tr>
+  <tr><td>17</td><td>Bitcoin está a <span class="candidate">$67,000</span></td><td><input readonly class="expected exp-yes" value="67000 ARS"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="17"></td></tr>
+  <tr><td>18</td><td>La inflación subió a <span class="candidate">8.3</span> por ciento</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="18"></td></tr>
+  <tr><td>19</td><td>El producto tiene <span class="candidate">4.5</span> estrellas de 5</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="19"></td></tr>
+  <tr><td>20</td><td>La deuda es de <span class="candidate">1 billón</span> de dólares</td><td><input readonly class="expected exp-yes" value="1000000000000 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="20"></td></tr>
+  <tr><td>21</td><td>Page <span class="candidate">42</span> of the report shows inflation at 8%</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="21"></td></tr>
+  <tr><td>22</td><td>+<span class="candidate">6,400M USD</span> por RIGI.</td><td><input readonly class="expected exp-yes" value="6400000000 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="22"></td></tr>
+  <tr><td>23</td><td>La inversión alcanzó <span class="candidate">6.400M USD</span>.</td><td><input readonly class="expected exp-yes" value="6400000000 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="23"></td></tr>
+  <tr><td>24</td><td>Final price: <span class="candidate">1,234.56 USD</span>.</td><td><input readonly class="expected exp-yes" value="1234.56 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="24"></td></tr>
+  <tr><td>25</td><td>Importe: <span class="candidate">1.234,56 EUR</span>.</td><td><input readonly class="expected exp-yes" value="1234.56 EUR"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="25"></td></tr>
+  <tr><td>26</td><td>Fee: <span class="candidate">3k USD</span>.</td><td><input readonly class="expected exp-yes" value="3000 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="26"></td></tr>
+  <tr><td>27</td><td>Amount: <span class="candidate">3,000k USD</span>.</td><td><input readonly class="expected exp-yes" value="3000000 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="27"></td></tr>
+  <tr><td>28</td><td>El costo fue de <span class="candidate">1,5 millones de euros</span>.</td><td><input readonly class="expected exp-yes" value="1500000 EUR"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="28"></td></tr>
+  <tr><td>29</td><td>The deal cost <span class="candidate">1.5 billion USD</span>.</td><td><input readonly class="expected exp-yes" value="1500000000 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="29"></td></tr>
+  <tr><td>30</td><td>Factura: <span class="candidate">AR$20.000</span>.</td><td><input readonly class="expected exp-yes" value="20000 ARS"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="30"></td></tr>
+  <tr><td>31</td><td>Subscription: <span class="candidate">US$9.99</span>.</td><td><input readonly class="expected exp-yes" value="9.99 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="31"></td></tr>
+  <tr><td>32</td><td>Invoice: <span class="candidate">USD 2,500</span>.</td><td><input readonly class="expected exp-yes" value="2500 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="32"></td></tr>
+  <tr><td>33</td><td>Precio: <span class="candidate">2.500 USD</span>.</td><td><input readonly class="expected exp-yes" value="2500 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="33"></td></tr>
+  <tr><td>34</td><td>Precio.<br><span class="candidate">100</span></td><td><input readonly class="expected exp-yes" value="100 ARS"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="34"></td></tr>
+  <tr><td>35</td><td><span class="candidate">1</span>. Precio del producto: $10</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="35"></td></tr>
+  <tr><td>36</td><td><span class="candidate">2</span>. Costo de envío explicado en el párrafo.</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="36"></td></tr>
+  <tr><td>37</td><td>The service has <span class="candidate">10 million</span> users.</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="37"></td></tr>
+  <tr><td>38</td><td>The startup reached <span class="candidate">5k</span> downloads.</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="38"></td></tr>
+  <tr><td>39</td><td>The candle lasted <span class="candidate">15</span>-minute.</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="39"></td></tr>
+  <tr><td>40</td><td>The report had <span class="candidate">500</span> readers.</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="40"></td></tr>
+  <tr><td>41</td><td>USD<br><span class="candidate">100 users</span></td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="41"></td></tr>
+  <tr><td>42</td><td>$<br><span class="candidate">100 users</span></td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="42"></td></tr>
+  <tr><td>43</td><td>EUR/USD outlook for <span class="candidate">2025</span>.</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="43"></td></tr>
+  <tr><td>44</td><td>USD/JPY on <span class="candidate">2024-06-10</span> market outlook.</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="44"></td></tr>
+  <tr><td>45</td><td>USD/JPY outlook improved due to <span class="candidate">12 analysts</span>.</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="45"></td></tr>
+  <tr><td>46</td><td>EUR/USD fell to support, with volume at <span class="candidate">500 million users</span>.</td><td><input readonly class="expected exp-no" value="Sin candidato"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="46"></td></tr>
+  <tr><td>47</td><td>USD/JPY on 8 Aug: <span class="candidate">158.123</span></td><td><input readonly class="expected exp-yes" value="158.123 JPY"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="47"></td></tr>
+  <tr><td>48</td><td>Asking price: <span class="candidate">10 million</span>.</td><td><input readonly class="expected exp-yes" value="10000000 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="48"></td></tr>
+  <tr><td>49</td><td>Presupuesto: <span class="candidate">un billon</span>.</td><td><input readonly class="expected exp-yes" value="1000000000000 USD"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="49"></td></tr>
+  <tr><td>50</td><td>Presupuesto: <span class="candidate">un billón</span>.</td><td><input readonly class="expected exp-yes" value="1000000000000 ARS"></td><td><input readonly class="observed"></td><td><input type="checkbox" class="check-err" data-id="50"></td></tr>
+</table>
+
+<div id="feedback"></div>
+
+<script>
+function syncState() {
+  updateFeedback();
+}
+
+function updateFeedback() {
+  const errors = [];
+  document.querySelectorAll('#tests tr').forEach(row => {
+    const err = row.querySelector('.check-err');
+    if (!err) return;
+    if (err.checked) {
+      errors.push({ id: err.dataset.id, context: row.cells[1]?.textContent, expected: row.querySelector('.expected')?.value });
+      row.classList.add('error-row');
+    } else {
+      row.classList.remove('error-row');
+    }
+  });
+  document.getElementById('passedTests').textContent = 50 - errors.length;
+  document.getElementById('failedTests').textContent = errors.length;
+  const fb = document.getElementById('feedback');
+  if (errors.length > 0) {
+    fb.style.display = 'block';
+    fb.textContent = 'FAILED: #' + errors.map(e => e.id).join(', #');
+  } else {
+    fb.style.display = 'none';
+  }
+}
+
+document.querySelectorAll('.expected').forEach(input => {
+  input.value = input.classList.contains('exp-yes') ? 'Debe aparecer' : 'No debe aparecer';
+});
+document.querySelectorAll('#tests tr').forEach(row => row.cells[3]?.remove());
+document.querySelectorAll('.check-err').forEach(cb => cb.addEventListener('change', syncState));
+if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+</script>
+
+</body>
+</html>

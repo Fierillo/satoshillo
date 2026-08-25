@@ -312,6 +312,7 @@ function isInEditableContext(node) {
   let el = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
   while (el && el !== document.body) {
     if (el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+    if (el.matches && el.matches('[role="textbox"], [role="searchbox"], [role="combobox"]')) return true;
     if (el.tagName === 'A' || el.tagName === 'BUTTON') return true;
     el = el.parentElement;
   }

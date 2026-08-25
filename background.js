@@ -111,6 +111,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getDisabled') {
     chrome.storage.local.get('disabledSites', data => {
       const disabled = data.disabledSites || [];
+      if (sender.tab && sender.tab.id != null && sender.url) {
+        const isDisabled = disabled.includes(new URL(sender.url).origin);
+        chrome.action.setBadgeText({ text: isDisabled ? 'OFF' : '', tabId: sender.tab.id });
+        chrome.action.setBadgeBackgroundColor({ color: '#F44336', tabId: sender.tab.id });
+      }
       sendResponse({ disabled });
     });
     return true;
@@ -129,19 +134,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true;
   }
-});
-
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status !== 'complete' || !tab.url) return;
-  try {
-    const origin = new URL(tab.url).origin;
-    chrome.storage.local.get('disabledSites', data => {
-      const disabled = data.disabledSites || [];
-      const isDisabled = disabled.includes(origin);
-      chrome.action.setBadgeText({ text: isDisabled ? 'OFF' : '', tabId });
-      chrome.action.setBadgeBackgroundColor({ color: '#F44336', tabId });
-    });
-  } catch {}
 });
 
 chrome.action.onClicked.addListener(async (tab) => {
@@ -165,16 +157,6 @@ chrome.action.onClicked.addListener(async (tab) => {
 chrome.runtime.onInstalled.addListener(() => {
   priceService.refreshPrices();
   chrome.alarms.create('refreshPrices', { periodInMinutes: 1 });
-  chrome.tabs.query({}, tabs => {
-    for (const tab of tabs) {
-      if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:')) {
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['price-parser.js', 'content.js']
-        }).catch(() => {});
-      }
-    }
-  });
 });
 
 chrome.runtime.onStartup.addListener(() => {

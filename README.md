@@ -38,6 +38,7 @@ The goal is to make Bitcoin the default unit of account in your daily browsing, 
 - Toggle per site: click the icon to disable on any domain (badge shows "OFF")
 - Priority-based real-rate routes: Yadio, Kraken + ExchangeRate-API, then Binance + FXRatesAPI
 - One complete source per update; no averaging and no fixed fiat multipliers
+- Local-only page analysis with no browsing data or detected text sent to external services
 - Automated parser, fallback selection, timeout, and cache-lifecycle tests with Node's built-in test runner
 - Pixel-art Satoshi symbol logo
 
@@ -62,6 +63,10 @@ Every update uses one complete source for all supported currencies (ARS, USD, EU
 - Binance BTC/USDT combined with live FXRatesAPI rates (second fallback).
 
 Sources are never averaged or mixed: the first route returning all four valid rates wins. No fixed fiat multipliers are used. Rates are cached globally, persisted across browser sessions, refreshed every minute, and served as provisional values if the network is temporarily unavailable.
+
+## Privacy
+
+Price detection runs locally in the browser. Satoshillo does not transmit page content, browsing history, selections, or detected prices. Network access is restricted to the exchange-rate providers listed above, and form fields plus editable controls are excluded from scanning. See the full [Privacy Policy](PRIVACY.md).
 
 ## Installation
 

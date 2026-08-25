@@ -1,6 +1,6 @@
 {
   "name": "satoshillo",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.js",

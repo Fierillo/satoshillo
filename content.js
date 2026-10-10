@@ -130,6 +130,10 @@ function removeExistingMenus() {
 
 function removeAllUi() {
   document.querySelectorAll('.satoshillo-candidate').forEach(el => {
+    if (el.dataset.accessible === 'true') {
+      el.remove();
+      return;
+    }
     const value = el.querySelector(':scope > .satoshillo-value');
     const firstChild = el.childNodes[0];
     if (value) {
@@ -360,6 +364,8 @@ function replaceTextNode(node, matches) {
   if (node.parentNode) node.parentNode.replaceChild(fragment, node);
 }
 
+const accessibleCandidates = new WeakMap();
+
 function flattenBlock(block) {
   const runs = [];
   let text = '';
@@ -373,6 +379,15 @@ function flattenBlock(block) {
       return;
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (node.dataset.accessible === 'true') return;
+    if (isInEditableContext(node)) return;
+    const label = node.getAttribute('aria-label');
+    if (label && /^\d+(?:[.,]\d+)*$/.test(label.trim())) {
+      const start = text.length;
+      text += label.trim();
+      runs.push({ node, start, end: text.length, accessible: true });
+      return;
+    }
     if (node.classList.contains('satoshillo-candidate')) {
       const value = node.querySelector(':scope > .satoshillo-value');
       const valueNode = value && value.firstChild;
@@ -404,6 +419,24 @@ function processBlock(block) {
   for (const candidate of SatoshilloParser.findPriceCandidates(text, { locale: pageLanguage })) {
     const run = runs.find(item => candidate.numberStart >= item.start && candidate.numberEnd <= item.end);
     if (!run) continue;
+    if (run.accessible) {
+      let annotation = accessibleCandidates.get(run.node);
+      if (!annotation || !annotation.isConnected) {
+        annotation = buildCandidateSpan('', candidate.amount, candidate.currency);
+        annotation.dataset.accessible = 'true';
+        run.node.parentNode.insertBefore(annotation, run.node.nextSibling);
+        accessibleCandidates.set(run.node, annotation);
+      }
+      annotation.dataset.amount = candidate.amount;
+      annotation.dataset.currency = candidate.currency;
+      annotation.style.top = '0px';
+      annotation.style.left = '0px';
+      const numberRect = run.node.getBoundingClientRect();
+      const annotationRect = annotation.getBoundingClientRect();
+      annotation.style.top = (numberRect.top - annotationRect.top) + 'px';
+      annotation.style.left = (numberRect.right - annotationRect.right) + 'px';
+      continue;
+    }
     if (run.candidate) {
       run.candidate.dataset.amount = candidate.amount;
       run.candidate.dataset.currency = candidate.currency;
@@ -433,7 +466,7 @@ let scanTimer = null;
 
 function observeDom() {
   if (activeObserver) {
-    activeObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+    activeObserver.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-label'] });
   }
 }
 
@@ -478,6 +511,7 @@ function startWatching() {
   activeObserver = new MutationObserver(mutations => {
     for (const mutation of mutations) {
       if (isInsideSatoshillo(mutation.target)) continue;
+      if (mutation.type === 'attributes' && !isInEditableContext(mutation.target)) return scheduleScan();
       const changedNodes = [...mutation.addedNodes, ...mutation.removedNodes];
       if (changedNodes.some(node => !isInsideSatoshillo(node))) return scheduleScan();
       if (mutation.type === 'characterData' && !isInsideSatoshillo(mutation.target) && !isInEditableContext(mutation.target)) {

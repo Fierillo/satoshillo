@@ -181,11 +181,42 @@ function buildCandidateSpan(raw, amount, currency) {
   return span;
 }
 
+function lockFloatButtonShape(button) {
+  const locked = {
+    width: '16px',
+    height: '16px',
+    minWidth: '16px',
+    maxWidth: '16px',
+    minHeight: '16px',
+    maxHeight: '16px',
+    padding: '0',
+    margin: '0',
+    border: '1px solid #f7931a',
+    borderRadius: '3px',
+    background: '#fff',
+    color: '#f7931a',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxSizing: 'border-box',
+    position: 'absolute',
+    top: '-10px',
+    right: '-14px',
+    left: 'auto',
+    bottom: 'auto',
+    flex: '0 0 16px'
+  };
+  Object.entries(locked).forEach(([prop, value]) => {
+    button.style.setProperty(prop.replace(/[A-Z]/g, m => '-' + m.toLowerCase()), value, 'important');
+  });
+}
+
 function createFloatButton() {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'satoshillo-float';
   button.title = 'ARS / USD / EUR / JPY';
+  lockFloatButtonShape(button);
   button.addEventListener('mouseenter', () => {
     cancelClose();
     openCurrencyMenu(button, button.parentNode);
@@ -209,6 +240,9 @@ async function openCurrencyMenu(anchor, candidate) {
   activeAnchor = anchor;
   const menu = document.createElement('div');
   menu.className = 'satoshillo-menu';
+  menu.style.setProperty('width', 'max-content', 'important');
+  menu.style.setProperty('min-width', '0', 'important');
+  menu.style.setProperty('max-width', 'none', 'important');
   const rect = anchor.getBoundingClientRect();
   menu.style.top = (rect.bottom + 4) + 'px';
   menu.style.left = rect.left + 'px';
@@ -541,19 +575,19 @@ chrome.runtime.onMessage.addListener((request) => {
 
 const style = document.createElement('style');
 style.textContent = `
-  .satoshillo-candidate { position: relative; display: inline; white-space: normal; }
+  .satoshillo-candidate { position: relative; display: inline; white-space: normal; width: auto !important; max-width: none !important; }
   .satoshillo-value { white-space: nowrap; }
-  .satoshillo-float { position: absolute; top: -10px; right: -14px; padding: 0 3px; border: 1px solid #f7931a; border-radius: 3px; background: #fff; color: #f7931a; font-size: 12px; cursor: pointer; font-family: inherit; line-height: 14px; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,.25); opacity: 0.4; transition: opacity 0.15s; user-select: none; }
-  .satoshillo-float::after { content: '₿'; }
-  .satoshillo-float:hover { border-color: #b86a0e; background: #fff7ed; opacity: 1; }
-  .satoshillo-menu { position: fixed; z-index: 2147483647; background: #fff !important; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.15); padding: 2px; color: #000 !important; font-family: Arial, Helvetica, sans-serif !important; }
-  .satoshillo-option { display: block; width: 100%; padding: 4px 10px; font-size: 12px; border: none; background: #fff !important; color: #000 !important; cursor: pointer; text-align: left; font-family: inherit; }
-  .satoshillo-option:disabled { color: #999 !important; cursor: default; }
-  .satoshillo-option.satoshillo-selected { font-weight: 700; }
-  .satoshillo-option:hover { background: #f0f0f0 !important; }
+  button.satoshillo-float { position: absolute !important; top: -10px !important; right: -14px !important; left: auto !important; bottom: auto !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; box-sizing: border-box !important; appearance: none !important; -webkit-appearance: none !important; margin: 0 !important; padding: 0 !important; width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important; min-height: 16px !important; max-height: 16px !important; flex: 0 0 16px !important; border: 1px solid #f7931a !important; border-radius: 3px !important; background: #fff !important; color: #f7931a !important; font-size: 12px !important; font-weight: 400 !important; font-family: Arial, Helvetica, sans-serif !important; line-height: 14px !important; letter-spacing: 0 !important; text-align: center !important; text-transform: none !important; cursor: pointer; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,.25) !important; opacity: 0.4; transition: opacity 0.15s; user-select: none; }
+  button.satoshillo-float::after { content: '₿'; color: #f7931a !important; }
+  button.satoshillo-float:hover, button.satoshillo-float:focus, button.satoshillo-float:active { width: 16px !important; height: 16px !important; border: 1px solid #f7931a !important; border-radius: 3px !important; background: #fff !important; color: #f7931a !important; opacity: 1; outline: none !important; }
+  div.satoshillo-menu { position: fixed !important; z-index: 2147483647; width: max-content !important; min-width: 0 !important; max-width: none !important; height: auto !important; background: #fff !important; border: 1px solid #ddd !important; border-radius: 4px !important; box-shadow: 0 2px 8px rgba(0,0,0,.15) !important; padding: 2px !important; color: #000 !important; font-family: Arial, Helvetica, sans-serif !important; }
+  button.satoshillo-option { display: block !important; box-sizing: border-box !important; appearance: none !important; -webkit-appearance: none !important; width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; margin: 0 !important; padding: 4px 10px !important; font-size: 12px !important; font-weight: 400 !important; line-height: normal !important; border: none !important; border-radius: 0 !important; background: #fff !important; color: #000 !important; cursor: pointer; text-align: left !important; white-space: nowrap !important; font-family: Arial, Helvetica, sans-serif !important; }
+  button.satoshillo-option:disabled { color: #999 !important; cursor: default; }
+  button.satoshillo-option.satoshillo-selected { font-weight: 700 !important; }
+  button.satoshillo-option:hover { background: #f0f0f0 !important; }
   .satoshillo-result.satoshillo-error { color: #999 !important; border-color: #ccc !important; background: #fafafa !important; }
   .satoshillo-selected { font-weight: 700; }
-  .satoshillo-result { position: static; display: inline-block; margin-left: 3px; white-space: nowrap; vertical-align: middle; font-size: 10px; font-weight: 600; line-height: 1; color: #f7931a; background: #fff; border: 1px solid #f7931a; border-radius: 3px; padding: 1px 3px; pointer-events: none; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  span.satoshillo-result { position: static !important; display: inline-block !important; box-sizing: border-box !important; width: auto !important; min-width: 0 !important; max-width: none !important; height: auto !important; margin-left: 3px !important; white-space: nowrap !important; vertical-align: middle; font-size: 10px !important; font-weight: 600 !important; font-family: Arial, Helvetica, sans-serif !important; line-height: 1 !important; color: #f7931a !important; background: #fff !important; border: 1px solid #f7931a !important; border-radius: 3px !important; padding: 1px 3px !important; pointer-events: none; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,.25) !important; }
 `;
 document.head.appendChild(style);
 

@@ -2,6 +2,7 @@
   "name": "satoshillo",
   "version": "1.4.6",
   "private": true,
+  "packageManager": "pnpm@10.28.2",
   "scripts": {
     "test": "node --test tests/*.test.js",
     "build": "node build.js"

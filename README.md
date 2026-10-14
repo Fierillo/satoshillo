@@ -81,13 +81,14 @@ Price detection runs locally in the browser. Satoshillo does not transmit page c
 ```bash
 git clone https://github.com/Fierillo/satoshillo.git
 cd satoshillo
-node build.js
+pnpm install
+pnpm build
 ```
 
 Run the automated tests with:
 
 ```bash
-npm test
+pnpm test
 ```
 
 This generates browser-specific builds in `dist/`:

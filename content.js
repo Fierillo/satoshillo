@@ -215,7 +215,7 @@ function createFloatButton() {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'satoshillo-float';
-  button.title = 'ARS / USD / EUR / JPY';
+  button.setAttribute('aria-label', 'ARS / USD / EUR / JPY');
   lockFloatButtonShape(button);
   button.addEventListener('mouseenter', () => {
     cancelClose();

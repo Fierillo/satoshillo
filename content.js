@@ -105,8 +105,6 @@ function detectPageLanguage() {
   for (const keyword of spanishKeywords) {
     if (pageText.includes(keyword)) return 'es';
   }
-  const browserLanguage = (navigator.language || '').toLowerCase();
-  if (browserLanguage.startsWith('es')) return 'es';
   return 'en';
 }
 

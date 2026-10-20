@@ -7,8 +7,8 @@
   const PAIR = /\b(USD|EUR|GBP|JPY|CHF|AUD|NZD|CAD|ARS)\/(USD|EUR|GBP|JPY|CHF|AUD|NZD|CAD|ARS)\b/gi;
   const CURRENCY = /\b(ARS|USD|EUR|JPY|pesos?|d[oó]lar(?:es)?|dollars?|euros?|yen)\b/i;
   const MONEY_WORD = /\b(price|cost|buy|pay|total|amount|fee|charge|bill|invoice|precio|costo|comprar|pagar|importe|oferta|factura|presupuesto|deuda|subscription|suscripci[oó]n|alquiler|spent|owe)\b/i;
-  const SPANISH_WORD = /\b(precio|costo|comprar|pagar|importe|oferta|factura|presupuesto|deuda|suscripci[oó]n|alquiler|sale|cuesta)\b/i;
-  const ENGLISH_WORD = /\b(price|cost|buy|pay|amount|fee|charge|bill|invoice|subscription|rent|spent|owe)\b/i;
+  const SPANISH_WORD = /\b(precio|costo|comprar|pagar|importe|oferta|factura|presupuesto|deuda|suscripci[oó]n|alquiler|cuesta)\b/i;
+  const ENGLISH_WORD = /\b(price|cost|buy|pay|amount|fee|charge|bill|invoice|subscription|rent|spent|owe|sale)\b/i;
   const NON_MONEY_UNIT = /^\s*(?:%|[-–]?\s*(?:minutes?|minutos?|pips?|points?|ticks?|users?|usuarios?|views?|vistas?|impressions?|impresiones|followers?|seguidores|downloads?|descargas|readers?|lectores|votes?|votos?|jobs?|empleos?|puestos|stars?|estrellas))\b/i;
   const FOREX_CUE = /(?:^|\b)(at|(?<!due\s)to|from|around|near|rate|closed\s+at|trading\s+at|quoted\s+at|cotiza(?:\s+(?:a|en))?|desde|hasta)\s*$/i;
   const CURRENCY_MAP = {

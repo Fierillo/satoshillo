@@ -133,6 +133,18 @@ test('does not leak monetary evidence across comma-separated clauses', () => {
   assert.deepEqual(compact('The price fell, while valuation reached 5 million.', 'en'), []);
 });
 
+test('keeps English sale prices in USD under a Spanish page locale', () => {
+  const sale = 'Sale price: $1,500';
+  assert.deepEqual(compact(sale, 'es'), [
+    { raw: '$1,500', amount: 1500, currency: 'USD', start: sale.indexOf('$1,500') }
+  ]);
+
+  const onSale = 'On sale for $1,500';
+  assert.deepEqual(compact(onSale, 'es'), [
+    { raw: '$1,500', amount: 1500, currency: 'USD', start: onSale.indexOf('$1,500') }
+  ]);
+});
+
 test('parses three-digit grouping on explicit symbol amounts', () => {
   const text = 'Bitcoin está a $67,000';
   assert.deepEqual(compact(text, 'es'), [
